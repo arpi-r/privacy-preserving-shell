@@ -489,6 +489,9 @@ __SYSCALL(__NR_uname, sys_newuname)
 __SYSCALL(__NR_sethostname, sys_sethostname)
 #define __NR_setdomainname 162
 __SYSCALL(__NR_setdomainname, sys_setdomainname)
+#define __NR_sample_test 550
+__SYSCALL(__NR_sample_test, sys_sample_test)
+
 
 #ifdef __ARCH_WANT_SET_GET_RLIMIT
 /* getrlimit and setrlimit are superseded with prlimit64 */
@@ -879,7 +882,7 @@ __SYSCALL(__NR_memfd_secret, sys_memfd_secret)
 #endif
 
 #undef __NR_syscalls
-#define __NR_syscalls 448
+#define __NR_syscalls 600
 
 /*
  * 32 bit systems traditionally used different

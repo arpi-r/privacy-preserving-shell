@@ -2666,6 +2666,13 @@ SYSCALL_DEFINE1(sysinfo, struct sysinfo __user *, info)
 	return 0;
 }
 
+SYSCALL_DEFINE0(sample_test)
+{
+    		printk("Example to test system call\n");
+    		return 3;
+}
+
+
 #ifdef CONFIG_COMPAT
 struct compat_sysinfo {
 	s32 uptime;
