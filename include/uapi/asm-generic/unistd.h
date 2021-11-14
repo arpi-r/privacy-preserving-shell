@@ -491,6 +491,8 @@ __SYSCALL(__NR_sethostname, sys_sethostname)
 __SYSCALL(__NR_setdomainname, sys_setdomainname)
 #define __NR_sample_test 550
 __SYSCALL(__NR_sample_test, sys_sample_test)
+#define __NR_ppshell_create 551
+__SYSCALL(__NR_ppshell_create, sys_ppshell_create)
 
 
 #ifdef __ARCH_WANT_SET_GET_RLIMIT

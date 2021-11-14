@@ -185,6 +185,8 @@ COND_SYSCALL(setfsuid);
 COND_SYSCALL(setfsgid);
 COND_SYSCALL(setgroups);
 COND_SYSCALL(getgroups);
+COND_SYSCALL(sample_test);
+COND_SYSCALL(ppshell_create);
 
 /* kernel/time.c */
 

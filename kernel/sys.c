@@ -61,6 +61,7 @@
 #include <linux/rcupdate.h>
 #include <linux/uidgid.h>
 #include <linux/cred.h>
+#include <linux/ppshell.h>
 
 #include <linux/nospec.h>
 
@@ -2670,6 +2671,135 @@ SYSCALL_DEFINE0(sample_test)
 {
     		printk("Example to test system call\n");
     		return 3;
+}
+
+static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprms, struct ppshell_create_params *kcprms)
+{
+	if(ucprms == NULL)
+	{
+		return -EINVAL;
+	}
+
+	u32 size;
+	int ret = 0;
+	
+	// backward compatability using size
+	memset(kcprms, 0, sizeof(*kcprms));
+
+	ret = get_user(size, &ucprms->size);
+	if (ret)
+		return ret;
+
+	if (!size)
+		size = PPSHELL_CREATE_PARAMS_SIZE_VER0;
+	if (size < PPSHELL_CREATE_PARAMS_SIZE_VER0 || size > PAGE_SIZE)
+	{
+		ret = -E2BIG;
+		return ret;			
+	}
+
+	ret = copy_struct_from_user(kcprms, sizeof(*kcprms), ucprms, size);
+	if (ret) {
+		return ret;
+	}
+
+	if(sizeof(*kcprms) > size) 
+	{
+		kcprms->size = size;
+	}
+
+	if(kcprms->name == NULL || kcprms->description == NULL || kcprms->command == NULL) // necessary parameters
+	{
+		ret = -EINVAL;
+		return ret;
+	}
+
+	kcprms->name = strndup_user(kcprms->name, PPS_SERVICE_NAME_MAX_LEN);
+	if (IS_ERR(kcprms->name)) 
+	{
+		ret = PTR_ERR(kcprms->name);
+		return ret;
+	}
+	if(!*kcprms->name) 
+	{
+		kfree(kcprms->name);
+		ret = -EINVAL; // name cant be empty string
+		return ret;
+	}
+
+	kcprms->description = strndup_user(kcprms->description, PPS_SERVICE_DESCR_MAX_LEN);
+	if (IS_ERR(kcprms->description)) 
+	{
+		kfree(kcprms->name);
+		ret = PTR_ERR(kcprms->description);
+		return ret;
+	}
+	if(!*kcprms->description) 
+	{
+		kfree(kcprms->name);
+		kfree(kcprms->description);
+		ret = -EINVAL; // description cant be empty string
+		return ret;
+	}
+
+	kcprms->command = strndup_user(kcprms->command, PPS_SERVICE_COMMAND_MAX_LEN);
+	if (IS_ERR(kcprms->command)) 
+	{
+		kfree(kcprms->name);
+		kfree(kcprms->description);
+		ret = PTR_ERR(kcprms->command);
+		return ret;
+	}
+	if(!*kcprms->command) 
+	{
+		kfree(kcprms->name);
+		kfree(kcprms->description);
+		kfree(kcprms->command);
+		ret = -EINVAL; // command cant be empty string
+		return ret;
+	}
+
+	if(kcprms->auth_pwd != NULL) 
+	{
+		kcprms->auth_pwd = strndup_user(kcprms->auth_pwd, PPS_SERVICE_PWD_MAX_LEN);
+		if (IS_ERR(kcprms->auth_pwd)) 
+		{
+			kfree(kcprms->name);
+			kfree(kcprms->description);
+			kfree(kcprms->command);
+			ret = PTR_ERR(kcprms->auth_pwd);
+			return ret;
+		}
+		if(!*kcprms->auth_pwd) 
+		{
+			kfree(kcprms->name);
+			kfree(kcprms->description);
+			kfree(kcprms->command);
+			kfree(kcprms->auth_pwd);
+			ret = -EINVAL; // auth_pwd cant be empty string
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms) 
+{
+	int err;
+	struct ppshell_create_params kcprms;
+
+	err = copy_ppshell_create_params(ucprms, &kcprms);
+	
+	if(err) 
+		return err;
+
+	printk("ppshell_create: copy successful (%u, %s, %s, %s, %s)", kcprms->size, kcprms->name, kcprms->description, kcprms->command)
+	if(kcprms->auth_pwd) 
+	{
+		printk("pps_create pwd: ", kcprms->auth_pwd);
+	}
+	return 0;
 }
 
 

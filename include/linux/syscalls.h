@@ -84,6 +84,7 @@ enum landlock_rule_type;
 #include <linux/quota.h>
 #include <linux/key.h>
 #include <linux/personality.h>
+#include <linux/ppshell.h>
 #include <trace/syscall.h>
 
 #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
@@ -1267,6 +1268,9 @@ asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
 
 
 asmlinkage long sys_sample_test(void);
+
+
+asmlinkage long sys_ppshell_create(struct ppshell_create_params __user *ucprms);
 
 /*
  * Not a real system call, but a placeholder for syscalls which are
