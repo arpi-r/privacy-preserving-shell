@@ -2675,13 +2675,14 @@ SYSCALL_DEFINE0(sample_test)
 
 static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprms, struct ppshell_create_params *kcprms)
 {
-	if(ucprms == NULL)
-	{
-		return -EINVAL;
-	}
-
 	u32 size;
 	int ret = 0;
+
+	if(ucprms == NULL)
+	{
+		ret = -EINVAL;
+		return ret;
+	}
 	
 	// backward compatability using size
 	memset(kcprms, 0, sizeof(*kcprms));
@@ -2794,11 +2795,7 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	if(err) 
 		return err;
 
-	printk("ppshell_create: copy successful (%u, %s, %s, %s, %s)", kcprms->size, kcprms->name, kcprms->description, kcprms->command)
-	if(kcprms->auth_pwd) 
-	{
-		printk("pps_create pwd: ", kcprms->auth_pwd);
-	}
+	printk("ppshell_create: copy successful (%u, %s, %s, %s)\n", kcprms.size, kcprms.name, kcprms.description, kcprms.command);
 	return 0;
 }
 

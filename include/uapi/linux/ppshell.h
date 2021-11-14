@@ -8,7 +8,7 @@
 #define PPS_SERVICE_COMMAND_MAX_LEN 1000
 #define PPS_SERVICE_PWD_MAX_LEN 100
 
-#define PPSHELL_CREATE_PARAMS_SIZE_VER0 36
+#define PPSHELL_CREATE_PARAMS_SIZE_VER0 40 // 4 bytes padding
 
 struct ppshell_create_params {
     __u32 size; // for fwd/bkw compatability
