@@ -2773,15 +2773,30 @@ static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprm
 		}
 		if(!*kcprms->auth_pwd) 
 		{
-			kfree(kcprms->name);
-			kfree(kcprms->description);
-			kfree(kcprms->command);
-			kfree(kcprms->auth_pwd);
 			ret = -EINVAL; // auth_pwd cant be empty string
-			return ret;
+			goto errout;
 		}
 	}
 
+	if(kcprms->auth_uid_list == NULL)
+		kcprms->auth_uid_len = 0;
+	else 
+	{
+		kcprms->auth_uid_list = vmemdup_user(kcprms->auth_uid_list, kcprms->auth_uid_len * sizeof(uid_t));
+		if (IS_ERR(kcprms->auth_uid_list))
+		{
+			ret = PTR_ERR(kcprms->auth_uid_list);
+			goto errout;
+		}
+	}
+
+	return ret;
+
+errout:
+	kfree(kcprms->name);
+	kfree(kcprms->description);
+	kfree(kcprms->command);
+	kfree(kcprms->auth_pwd);
 	return ret;
 }
 
@@ -2796,6 +2811,19 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 		return err;
 
 	printk("ppshell_create: copy successful (%u, %s, %s, %s)\n", kcprms.size, kcprms.name, kcprms.description, kcprms.command);
+	if(kcprms.auth_pwd)
+	{
+		printk("ppshell_create: copy successful: pwd: %s\n", kcprms.auth_pwd);
+	}
+
+	printk("ppshell_create: copy successful: auth uid len: %s\n", kcprms.auth_uid_len);	
+
+	for(int i = 0; i < kcprms.auth_uid_len; i++)
+	{
+		printk("ppshell_create: copy successful: auth uid [%d]: %u\n", ctr, *(kcprms.auth_uid_list + i));
+	}
+
+
 	return 0;
 }
 
