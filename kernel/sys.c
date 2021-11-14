@@ -2816,11 +2816,12 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 		printk("ppshell_create: copy successful: pwd: %s\n", kcprms.auth_pwd);
 	}
 
-	printk("ppshell_create: copy successful: auth uid len: %s\n", kcprms.auth_uid_len);	
-
-	for(int i = 0; i < kcprms.auth_uid_len; i++)
+	printk("ppshell_create: copy successful: auth uid len: %u\n", kcprms.auth_uid_len);	
+	
+	int iter;
+	for(iter = 0; iter < kcprms.auth_uid_len; iter++)
 	{
-		printk("ppshell_create: copy successful: auth uid [%d]: %u\n", ctr, *(kcprms.auth_uid_list + i));
+		printk("ppshell_create: copy successful: auth uid [%d]: %u\n", iter, *(kcprms.auth_uid_list + iter));
 	}
 
 
