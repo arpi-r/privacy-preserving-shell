@@ -2677,6 +2677,7 @@ static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprm
 {
 	u32 size;
 	int ret = 0;
+	u32 iter = 0;
 
 	if(ucprms == NULL)
 	{
@@ -2782,10 +2783,76 @@ static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprm
 		kcprms->auth_uid_len = 0;
 	else 
 	{
+		if(kcprms->auth_uid_len > PPS_SERVICE_AUTH_UID_LIST_MAX_LEN)
+			kcprms->auth_uid_len = PPS_SERVICE_AUTH_UID_LIST_MAX_LEN;
+
 		kcprms->auth_uid_list = vmemdup_user(kcprms->auth_uid_list, kcprms->auth_uid_len * sizeof(uid_t));
 		if (IS_ERR(kcprms->auth_uid_list))
 		{
 			ret = PTR_ERR(kcprms->auth_uid_list);
+			goto errout;
+		}
+	}
+
+	if(kcprms->environ == NULL)
+		kcprms->env_len = 0;
+	else 
+	{
+		if(kcprms->env_len > PPS_SERVICE_ENV_MAX_LEN)
+			kcprms->env_len = PPS_SERVICE_ENV_MAX_LEN;
+
+		kcprms->environ = vmemdup_user(kcprms->environ, kcprms->env_len * sizeof(char*));
+		if (IS_ERR(kcprms->environ))
+		{
+			ret = PTR_ERR(kcprms->environ);
+			kvfree(kcprms->auth_uid_list);
+			goto errout;
+		}
+
+		// copy all strings one by one
+		while(iter < kcprms->env_len)
+		{
+			char* cur_env_ptr = *(kcprms->environ + iter);
+
+			if(cur_env_ptr == NULL)
+			{
+				ret = -EINVAL;
+				break;
+			}
+
+			cur_env_ptr = strndup_user(cur_env_ptr, PPS_SERVICE_ENV_VAR_MAX_LEN);
+			if (IS_ERR(cur_env_ptr)) 
+				ret = PTR_ERR(cur_env_ptr);	
+			else if(!*cur_env_ptr) //env var cant be empty string
+			{
+				ret = -EINVAL;
+				kfree(cur_env_ptr);
+			}
+			if(ret != 0)
+				break;
+			
+			*(kcprms->environ + iter) = cur_env_ptr; //copy pointer to kernel space
+			iter++;
+		}
+
+		if(ret != 0) 
+		{
+			kvfree(kcprms->auth_uid_list);
+			// free all prev env vars
+			if(iter > 0) // unsigned, be careful!
+			{
+				iter--;
+				while(iter >= 0)
+				{
+					kfree(*(kcprms->environ + iter));
+					if(iter == 0)
+						break;
+					iter--;
+				}
+			}
+			// free char** pointer
+			kvfree(kcprms->environ);
+
 			goto errout;
 		}
 	}
@@ -2822,6 +2889,12 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	for(iter = 0; iter < kcprms.auth_uid_len; iter++)
 	{
 		printk("ppshell_create: copy successful: auth uid [%d]: %u\n", iter, *(kcprms.auth_uid_list + iter));
+	}
+
+	printk("ppshell_create: copy successful: env len: %u\n", kcprms.env_len);	
+	for(iter = 0; iter < kcprms.env_len; iter++)
+	{
+		printk("ppshell_create: copy successful: environ [%d]: %s\n", iter, *(kcprms.environ + iter));
 	}
 
 
