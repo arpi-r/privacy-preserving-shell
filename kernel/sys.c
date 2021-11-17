@@ -2714,7 +2714,7 @@ struct ppshell_service* find_pps_service_by_name(uid_t owner, char* name)
 	return found;
 }
 
-void debug_print_pps_services()
+void debug_print_pps_services(void)
 {
 	__u32 iter;
 	struct ppshell_service* cur = NULL;
@@ -2722,7 +2722,7 @@ void debug_print_pps_services()
 
 	list_for_each_entry(cur, &ppshell_service_list_head, list) // iterates over all elements
 	{
-		printk("service: (%u, %s, %s, %s)\n", cur->size, cur->name, cur->description, cur->command);
+		printk("service: (%u, %s, %s, %s)\n", cur->owner, cur->name, cur->description, cur->command);
 		if(cur->auth_pwd)
 		{
 			printk("service: pwd: %s\n", cur->auth_pwd);
@@ -2942,15 +2942,18 @@ errout:
 SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms) 
 {
 	int err;
+	int iter;
+	uid_t owner;
 	struct ppshell_create_params kcprms;
+	struct ppshell_service* new_service = NULL;
 
 	err = copy_ppshell_create_params(ucprms, &kcprms);
 	
 	if(err) 
 		return err;
 
-	uid_t owner = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
-	if(find_pps_service_by_name(owner, kcprms->name)) // service should be unique by name and uid
+	owner = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
+	if(find_pps_service_by_name(owner, kcprms.name)) // service should be unique by name and uid
 	{
 		err = -EINVAL;
 		kfree(kcprms.name);
@@ -2960,13 +2963,13 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 		kvfree(kcprms.auth_uid_list);
 
 		for(iter = 0; iter < kcprms.env_len; iter++)
-			kfree(*(kcprms->environ + iter));
+			kfree(*(kcprms.environ + iter));
 		kvfree(kcprms.environ);
 
 		return err;
 	}
 
-	struct ppshell_service* new_service = (struct ppshell_service*) kmalloc(sizeof(struct ppshell_service), GFP_KERNEL);
+	new_service = (struct ppshell_service*) kmalloc(sizeof(struct ppshell_service), GFP_KERNEL);
 	// copy all fields
 	new_service->owner = owner;
 	new_service->name = kcprms.name;
