@@ -2673,6 +2673,78 @@ SYSCALL_DEFINE0(sample_test)
     		return 3;
 }
 
+// structure of a pps service
+struct ppshell_service {
+	uid_t owner;
+	char *name; // name for the service, unique per user
+    
+	char *description; // verbose description of the service, shown to other users
+    char *command; // command to be executed // will be passed as -c arg to /bin/bash
+    char *auth_pwd;// password based auth (NULL = disabled)
+    
+	uid_t *auth_uid_list; // list of uids (NULL = disabled)
+    __u32 auth_uid_len; // length of the auth uid list
+    
+	char **environ; // list of environment vars to be passed to service
+    __u32 env_len;
+
+	struct list_head list; // doubly linked list
+};
+
+DEFINE_RAW_SPINLOCK(ppshell_service_list_lock);
+LIST_HEAD(ppshell_service_list_head); // initializes an empty list
+
+struct ppshell_service* find_pps_service_by_name(uid_t owner, char* name)
+{
+	struct ppshell_service* cur = NULL;
+	struct ppshell_service* found = NULL;
+	raw_spin_lock(&ppshell_service_list_lock);
+
+	list_for_each_entry(cur, &ppshell_service_list_head, list) // iterates over all elements
+	{
+		if(cur->owner != owner)
+			continue;
+		if(strcmp(cur->name, name))
+			continue;
+		found = cur;
+		break;
+	}
+	
+    raw_spin_unlock(&ppshell_service_list_lock);
+	return found;
+}
+
+void debug_print_pps_services()
+{
+	__u32 iter;
+	struct ppshell_service* cur = NULL;
+	raw_spin_lock(&ppshell_service_list_lock);
+
+	list_for_each_entry(cur, &ppshell_service_list_head, list) // iterates over all elements
+	{
+		printk("service: (%u, %s, %s, %s)\n", cur->size, cur->name, cur->description, cur->command);
+		if(cur->auth_pwd)
+		{
+			printk("service: pwd: %s\n", cur->auth_pwd);
+		}
+
+		printk("service: auth uid len: %u\n", cur->auth_uid_len);	
+		
+		for(iter = 0; iter < cur->auth_uid_len; iter++)
+		{
+			printk("service: auth uid [%d]: %u\n", iter, *(cur->auth_uid_list + iter));
+		}
+
+		printk("service: env len: %u\n", cur->env_len);	
+		for(iter = 0; iter < cur->env_len; iter++)
+		{
+			printk("service: environ [%d]: %s\n", iter, *(cur->environ + iter));
+		}
+	}
+	
+    raw_spin_unlock(&ppshell_service_list_lock);
+}
+
 static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprms, struct ppshell_create_params *kcprms)
 {
 	u32 size;
@@ -2877,26 +2949,42 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	if(err) 
 		return err;
 
-	printk("ppshell_create: copy successful (%u, %s, %s, %s)\n", kcprms.size, kcprms.name, kcprms.description, kcprms.command);
-	if(kcprms.auth_pwd)
+	uid_t owner = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
+	if(find_pps_service_by_name(owner, kcprms->name)) // service should be unique by name and uid
 	{
-		printk("ppshell_create: copy successful: pwd: %s\n", kcprms.auth_pwd);
+		err = -EINVAL;
+		kfree(kcprms.name);
+		kfree(kcprms.description);
+		kfree(kcprms.command);
+		kfree(kcprms.auth_pwd);
+		kvfree(kcprms.auth_uid_list);
+
+		for(iter = 0; iter < kcprms.env_len; iter++)
+			kfree(*(kcprms->environ + iter));
+		kvfree(kcprms.environ);
+
+		return err;
 	}
 
-	printk("ppshell_create: copy successful: auth uid len: %u\n", kcprms.auth_uid_len);	
-	
-	int iter;
-	for(iter = 0; iter < kcprms.auth_uid_len; iter++)
-	{
-		printk("ppshell_create: copy successful: auth uid [%d]: %u\n", iter, *(kcprms.auth_uid_list + iter));
-	}
+	struct ppshell_service* new_service = (struct ppshell_service*) kmalloc(sizeof(struct ppshell_service), GFP_KERNEL);
+	// copy all fields
+	new_service->owner = owner;
+	new_service->name = kcprms.name;
+	new_service->description = kcprms.description;
+	new_service->command = kcprms.command;
+	new_service->auth_pwd = kcprms.auth_pwd;
+	new_service->auth_uid_list = kcprms.auth_uid_list;
+	new_service->auth_uid_len = kcprms.auth_uid_len;
+	new_service->environ = kcprms.environ;
+	new_service->env_len = kcprms.env_len;
 
-	printk("ppshell_create: copy successful: env len: %u\n", kcprms.env_len);	
-	for(iter = 0; iter < kcprms.env_len; iter++)
-	{
-		printk("ppshell_create: copy successful: environ [%d]: %s\n", iter, *(kcprms.environ + iter));
-	}
+	INIT_LIST_HEAD(&new_service->list); // initialize list field
 
+	raw_spin_lock(&ppshell_service_list_lock);
+	list_add(&new_service->list, &ppshell_service_list_head); // add to linked list
+	raw_spin_unlock(&ppshell_service_list_lock);
+
+	debug_print_pps_services(); //todo: temporary for debugging, remove later
 
 	return 0;
 }
