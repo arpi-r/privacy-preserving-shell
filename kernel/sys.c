@@ -2675,7 +2675,14 @@ SYSCALL_DEFINE0(sample_test)
 
 // structure of a pps service
 struct ppshell_service {
-	uid_t owner;
+	// creds
+	uid_t owner_uid;
+	uid_t owner_euid;
+	uid_t owner_suid;
+	gid_t owner_gid; 
+	gid_t owner_egid; 
+	gid_t owner_sgid; 
+
 	char *name; // name for the service, unique per user
     
 	char *description; // verbose description of the service, shown to other users
@@ -2694,7 +2701,7 @@ struct ppshell_service {
 DEFINE_RAW_SPINLOCK(ppshell_service_list_lock);
 LIST_HEAD(ppshell_service_list_head); // initializes an empty list
 
-struct ppshell_service* find_pps_service_by_name(uid_t owner, char* name)
+struct ppshell_service* find_pps_service_by_name(uid_t owner_euid, char* name)
 {
 	struct ppshell_service* cur = NULL;
 	struct ppshell_service* found = NULL;
@@ -2702,7 +2709,7 @@ struct ppshell_service* find_pps_service_by_name(uid_t owner, char* name)
 
 	list_for_each_entry(cur, &ppshell_service_list_head, list) // iterates over all elements
 	{
-		if(cur->owner != owner)
+		if(cur->owner_euid != owner_euid)
 			continue;
 		if(strcmp(cur->name, name))
 			continue;
@@ -2722,7 +2729,9 @@ void debug_print_pps_services(void)
 
 	list_for_each_entry(cur, &ppshell_service_list_head, list) // iterates over all elements
 	{
-		printk("service: (%u, %s, %s, %s)\n", cur->owner, cur->name, cur->description, cur->command);
+		printk("service creds: uids: (%u, %u, %u)\n", cur->owner_uid, cur->owner_euid, cur->owner_suid);
+		printk("service creds: gids: (%u, %u, %u)\n", cur->owner_gid, cur->owner_egid, cur->owner_sgid);
+		printk("service: (%s, %s, %s)\n", cur->name, cur->description, cur->command);
 		if(cur->auth_pwd)
 		{
 			printk("service: pwd: %s\n", cur->auth_pwd);
@@ -2943,7 +2952,8 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 {
 	int err;
 	int iter;
-	uid_t owner;
+	uid_t owner_uid, owner_euid, owner_suid;
+	gid_t owner_gid, owner_egid, owner_sgid;
 	struct ppshell_create_params kcprms;
 	struct ppshell_service* new_service = NULL;
 
@@ -2952,8 +2962,15 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	if(err) 
 		return err;
 
-	owner = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
-	if(find_pps_service_by_name(owner, kcprms.name)) // service should be unique by name and uid
+	owner_uid = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
+	owner_euid = from_kuid_munged(current_user_ns(), current_euid());
+	owner_suid = from_kuid_munged(current_user_ns(), current_suid());
+	owner_gid = from_kuid_munged(current_user_ns(), current_gid());
+	owner_egid = from_kuid_munged(current_user_ns(), current_egid());
+	owner_sgid = from_kuid_munged(current_user_ns(), current_sgid());
+	
+
+	if(find_pps_service_by_name(owner_euid, kcprms.name)) // service should be unique by name and euid
 	{
 		err = -EINVAL;
 		kfree(kcprms.name);
@@ -2970,8 +2987,30 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	}
 
 	new_service = (struct ppshell_service*) kmalloc(sizeof(struct ppshell_service), GFP_KERNEL);
+	if(new_service == NULL)
+	{
+		err = -EAGAIN;
+		kfree(kcprms.name);
+		kfree(kcprms.description);
+		kfree(kcprms.command);
+		kfree(kcprms.auth_pwd);
+		kvfree(kcprms.auth_uid_list);
+
+		for(iter = 0; iter < kcprms.env_len; iter++)
+			kfree(*(kcprms.environ + iter));
+		kvfree(kcprms.environ);
+
+		return err;
+	}
+
 	// copy all fields
-	new_service->owner = owner;
+	new_service->owner_uid = owner_uid;
+	new_service->owner_euid = owner_euid;
+	new_service->owner_suid = owner_suid;
+	new_service->owner_gid = owner_gid;
+	new_service->owner_egid = owner_egid;
+	new_service->owner_sgid = owner_sgid;
+
 	new_service->name = kcprms.name;
 	new_service->description = kcprms.description;
 	new_service->command = kcprms.command;
