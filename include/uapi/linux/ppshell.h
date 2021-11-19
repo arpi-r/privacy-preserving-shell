@@ -12,6 +12,7 @@
 #define PPS_SERVICE_ENV_VAR_MAX_LEN 1000
 
 #define PPSHELL_CREATE_PARAMS_SIZE_VER0 72 // 4 bytes paddings for __u32
+#define PPSHELL_CALL_PARAMS_SIZE_VER0 32 // 4 bytes paddings for __u32
 
 struct ppshell_create_params {
     __u32 size; // for fwd/bkw compatability
@@ -25,5 +26,11 @@ struct ppshell_create_params {
     __u32 env_len;
 };
 
+struct ppshell_call_params {
+    __u32 size; // for fwd/bkw compatability
+    char *name; // name for the service to be called
+    uid_t owner_euid; // effective user id of the owner
+    char *auth_pwd;// password based auth (NULL = not checked)
+};
 
 #endif /* _UAPI_LINUX_PPSHELL_H */

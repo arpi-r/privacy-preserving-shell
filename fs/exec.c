@@ -1926,6 +1926,84 @@ out_ret:
 	return retval;
 }
 
+/**
+ * @brief When we call a pps service, it happens from kernel space. So all pointers are in kernel space
+ * But we do exec as though it was called from userspace to drop priviliges.
+ * @param bash_filename is usually "/bin/bash"
+ * @param argv argv provided by user who created service
+ * @param argv_len number of arguments
+ * @param envp env vars provided by user who created service
+ * @param env_len number of env vars
+ * 
+ * @return 0 iff success. Ideally this function will never return back to user space (todo).
+ */
+int kernel_execve_pps(const char *bash_filename, const char *const *argv, int argv_len, const char *const *envp, int env_len)
+{
+	struct filename *filename;
+	int fd = AT_FDCWD;
+
+	filename = getname_kernel(bash_filename);
+	if (IS_ERR(filename))
+		return PTR_ERR(filename);
+
+	struct linux_binprm *bprm;
+	int retval;
+
+	if (IS_ERR(filename))
+		return PTR_ERR(filename);
+
+	/*
+	 * We move the actual failure in case of RLIMIT_NPROC excess from
+	 * set*uid() to execve() because too many poorly written programs
+	 * don't check setuid() return code.  Here we additionally recheck
+	 * whether NPROC limit is still exceeded.
+	 */
+	if ((current->flags & PF_NPROC_EXCEEDED) &&
+	    is_ucounts_overlimit(current_ucounts(), UCOUNT_RLIMIT_NPROC, rlimit(RLIMIT_NPROC))) {
+		retval = -EAGAIN;
+		goto out_ret;
+	}
+
+	/* We're below the limit (still or again), so we don't want to make
+	 * further execve() calls fail. */
+	current->flags &= ~PF_NPROC_EXCEEDED;
+
+	bprm = alloc_bprm(fd, filename);
+	if (IS_ERR(bprm)) {
+		retval = PTR_ERR(bprm);
+		goto out_ret;
+	}
+
+	
+	bprm->argc = argv_len;
+	bprm->envc = env_len;
+
+	retval = bprm_stack_limits(bprm);
+	if (retval < 0)
+		goto out_free;
+
+	retval = copy_string_kernel(bprm->filename, bprm);
+	if (retval < 0)
+		goto out_free;
+	bprm->exec = bprm->p;
+
+	retval = copy_strings_kernel(bprm->envc, envp, bprm); // env and arg are in kernel space
+	if (retval < 0)
+		goto out_free;
+
+	retval = copy_strings_kernel(bprm->argc, argv, bprm);
+	if (retval < 0)
+		goto out_free;
+
+	retval = bprm_execve(bprm, fd, filename, 0);
+out_free:
+	free_bprm(bprm);
+
+out_ret:
+	putname(filename);
+	return retval;
+}
+
 int kernel_execve(const char *kernel_filename,
 		  const char *const *argv, const char *const *envp)
 {

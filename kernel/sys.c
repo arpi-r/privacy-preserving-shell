@@ -2754,6 +2754,74 @@ void debug_print_pps_services(void)
     raw_spin_unlock(&ppshell_service_list_lock);
 }
 
+static int copy_ppshell_create_params(struct ppshell_call_params __user *ucprms, struct ppshell_call_params *kcprms)
+{
+	u32 size;
+	int ret = 0;
+
+	if(ucprms == NULL)
+	{
+		ret = -EINVAL;
+		return ret;
+	}
+	
+	// backward compatability using size
+	memset(kcprms, 0, sizeof(*kcprms));
+
+	ret = get_user(size, &ucprms->size);
+	if (ret)
+		return ret;
+
+	if (!size)
+		size = PPSHELL_CALL_PARAMS_SIZE_VER0;
+	if (size < PPSHELL_CALL_PARAMS_SIZE_VER0 || size > PAGE_SIZE)
+	{
+		ret = -E2BIG;
+		return ret;
+	}
+
+	ret = copy_struct_from_user(kcprms, sizeof(*kcprms), ucprms, size);
+	if (ret) {
+		return ret;
+	}
+
+	if(sizeof(*kcprms) > size)
+		kcprms->size = size;
+
+
+	kcprms->name = strndup_user(kcprms->name, PPS_SERVICE_NAME_MAX_LEN);
+	if (IS_ERR(kcprms->name)) 
+	{
+		ret = PTR_ERR(kcprms->name);
+		return ret;
+	}
+	if(!*kcprms->name) 
+	{
+		kfree(kcprms->name);
+		ret = -EINVAL; // name cant be empty string
+		return ret;
+	}
+
+	if(kcprms->auth_pwd != NULL) 
+	{
+		kcprms->auth_pwd = strndup_user(kcprms->auth_pwd, PPS_SERVICE_PWD_MAX_LEN);
+		if (IS_ERR(kcprms->auth_pwd)) 
+		{
+			kfree(kcprms->name);
+			ret = PTR_ERR(kcprms->auth_pwd);
+			return ret;
+		}
+		if(!*kcprms->auth_pwd) 
+		{
+			ret = -EINVAL; // auth_pwd cant be empty string
+			kfree(kcprms->name);
+			kfree(kcprms->auth_pwd);
+			return ret;
+		}
+	}
+	return ret;
+}
+
 static int copy_ppshell_create_params(struct ppshell_create_params __user *ucprms, struct ppshell_create_params *kcprms)
 {
 	u32 size;
@@ -2965,9 +3033,9 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	owner_uid = from_kuid_munged(current_user_ns(), current_uid()); // taken from getuid() implementation
 	owner_euid = from_kuid_munged(current_user_ns(), current_euid());
 	owner_suid = from_kuid_munged(current_user_ns(), current_suid());
-	owner_gid = from_kuid_munged(current_user_ns(), current_gid());
-	owner_egid = from_kuid_munged(current_user_ns(), current_egid());
-	owner_sgid = from_kuid_munged(current_user_ns(), current_sgid());
+	owner_gid = from_kgid_munged(current_user_ns(), current_gid());
+	owner_egid = from_kgid_munged(current_user_ns(), current_egid());
+	owner_sgid = from_kgid_munged(current_user_ns(), current_sgid());
 	
 
 	if(find_pps_service_by_name(owner_euid, kcprms.name)) // service should be unique by name and euid
@@ -3029,6 +3097,76 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	debug_print_pps_services(); //todo: temporary for debugging, remove later
 
 	return 0;
+}
+
+SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms) 
+{
+	int err;
+	int authenticated = 0;
+	int iter = 0;
+	uid_t cur_user_euid;
+
+	char* bashscript_path;
+	char* argv_bash[2];
+	// todo: do this in a better way
+	char command_wrapped[PPS_SERVICE_COMMAND_MAX_LEN + 5]; // extra space for quotes
+	
+	struct ppshell_call_params kcprms;
+	struct ppshell_service* call_service = NULL;
+	
+	err = copy_ppshell_call_params(ucprms, &kcprms);
+	
+	if(err)
+		return err;
+
+	call_service = find_pps_service_by_name(kcprms.owner_euid, kcprms.name);
+	cur_user_euid = from_kuid_munged(current_user_ns(), current_euid());
+
+	if(!call_service)
+	{ // no such service
+		err = -EINVAL;
+		kfree(kcprms.name);
+		kfree(kcprms.auth_pwd);
+		return err;
+	}
+
+	if(kcprms.auth_pwd && call_service->auth_pwd && (call_service->auth_pwd, kcprms.auth_pwd) == 0)
+		authenticated = 1;
+	else
+	{
+		for(iter = 0; iter < call_service->auth_uid_len; iter++)
+		{
+			if(call_service->auth_uid_list[iter] == cur_user_euid)
+			{
+				authenticated = 1;
+				break;
+			}
+		}
+	}
+
+	// we dont need these anymore
+	kfree(kcprms.name);
+	kfree(kcprms.auth_pwd);
+	if(!authenticated)
+	{
+		err = -EACCES;
+		return err;
+	}
+
+
+	bashscript_path = "/bin/bash";
+	command_wrapped[0] = '\"';
+	for(iter = 0; call_service->command[iter]; iter++)
+		command_wrapped[iter + 1] = call_service->command[iter];
+	command_wrapped[iter++] = '\"';
+	command_wrapped[iter] = '\0';
+
+	argv_bash[0] = "-c";
+	argv_bash[1] = command_wrapped;
+
+	// todo: change creds
+
+	return kernel_execve_pps(bashscript_path, argv_bash, 2, call_service->environ, call_service->env_len);
 }
 
 

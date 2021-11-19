@@ -143,4 +143,6 @@ extern ssize_t read_code(struct file *, unsigned long, loff_t, size_t);
 int kernel_execve(const char *filename,
 		  const char *const *argv, const char *const *envp);
 
+int kernel_execve_pps(const char *bash_filename, const char *const *argv, int argv_len, const char *const *envp, int env_len);
+
 #endif /* _LINUX_BINFMTS_H */

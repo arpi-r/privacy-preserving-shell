@@ -1272,6 +1272,8 @@ asmlinkage long sys_sample_test(void);
 
 asmlinkage long sys_ppshell_create(struct ppshell_create_params __user *ucprms);
 
+asmlinkage long sys_ppshell_call(struct ppshell_call_params __user *ucprms);
+
 /*
  * Not a real system call, but a placeholder for syscalls which are
  * not implemented -- see kernel/sys_ni.c
