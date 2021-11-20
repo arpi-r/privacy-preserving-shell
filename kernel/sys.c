@@ -3107,7 +3107,7 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	uid_t cur_user_euid;
 
 	char* bashscript_path;
-	char* argv_bash[2];
+	char* argv_bash[3];
 	// todo: do this in a better way
 	char command_wrapped[PPS_SERVICE_COMMAND_MAX_LEN + 5]; // extra space for quotes
 	
@@ -3158,15 +3158,16 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	command_wrapped[0] = '\"';
 	for(iter = 0; call_service->command[iter]; iter++)
 		command_wrapped[iter + 1] = call_service->command[iter];
-	command_wrapped[iter++] = '\"';
-	command_wrapped[iter] = '\0';
+	command_wrapped[++iter] = '\"';
+	command_wrapped[++iter] = '\0';
 
-	argv_bash[0] = "-c";
-	argv_bash[1] = command_wrapped;
+	argv_bash[0] = bashscript_path;
+	argv_bash[1] = "-c";
+	argv_bash[2] = command_wrapped;
 
 	// todo: change creds
 
-	return kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 2, (const char* const*)call_service->environ, call_service->env_len);
+	return kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
 }
 
 
