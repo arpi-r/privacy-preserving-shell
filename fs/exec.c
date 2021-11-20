@@ -1941,16 +1941,13 @@ int kernel_execve_pps(const char *bash_filename, const char *const *argv, int ar
 {
 	struct filename *filename;
 	int fd = AT_FDCWD;
-
+	struct linux_binprm *bprm;
+	int retval;
+	
 	filename = getname_kernel(bash_filename);
 	if (IS_ERR(filename))
 		return PTR_ERR(filename);
 
-	struct linux_binprm *bprm;
-	int retval;
-
-	if (IS_ERR(filename))
-		return PTR_ERR(filename);
 
 	/*
 	 * We move the actual failure in case of RLIMIT_NPROC excess from

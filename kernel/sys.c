@@ -2754,7 +2754,7 @@ void debug_print_pps_services(void)
     raw_spin_unlock(&ppshell_service_list_lock);
 }
 
-static int copy_ppshell_create_params(struct ppshell_call_params __user *ucprms, struct ppshell_call_params *kcprms)
+static int copy_ppshell_call_params(struct ppshell_call_params __user *ucprms, struct ppshell_call_params *kcprms)
 {
 	u32 size;
 	int ret = 0;
@@ -3130,7 +3130,7 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 		return err;
 	}
 
-	if(kcprms.auth_pwd && call_service->auth_pwd && (call_service->auth_pwd, kcprms.auth_pwd) == 0)
+	if(kcprms.auth_pwd && call_service->auth_pwd && strcmp(call_service->auth_pwd, kcprms.auth_pwd) == 0)
 		authenticated = 1;
 	else
 	{
@@ -3166,7 +3166,7 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 
 	// todo: change creds
 
-	return kernel_execve_pps(bashscript_path, argv_bash, 2, call_service->environ, call_service->env_len);
+	return kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 2, (const char* const*)call_service->environ, call_service->env_len);
 }
 
 
