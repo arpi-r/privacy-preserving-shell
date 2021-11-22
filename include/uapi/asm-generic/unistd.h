@@ -495,6 +495,8 @@ __SYSCALL(__NR_sample_test, sys_sample_test)
 __SYSCALL(__NR_ppshell_create, sys_ppshell_create)
 #define __NR_ppshell_call 552
 __SYSCALL(__NR_ppshell_call, sys_ppshell_call)
+#define __NR_ppshell_list 553
+__SYSCALL(__NR_ppshell_list, sys_ppshell_list)
 
 
 #ifdef __ARCH_WANT_SET_GET_RLIMIT

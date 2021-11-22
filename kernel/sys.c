@@ -2717,7 +2717,7 @@ struct ppshell_service* find_pps_service_by_name(uid_t owner_euid, char* name)
 		break;
 	}
 	
-    raw_spin_unlock(&ppshell_service_list_lock);
+	raw_spin_unlock(&ppshell_service_list_lock);
 	return found;
 }
 
@@ -3226,6 +3226,21 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	return kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
 }
 
+SYSCALL_DEFINE0(ppshell_list)
+{
+	struct ppshell_service* cur = NULL;
+	
+	printk("ppshell list:\n");
+	
+	raw_spin_lock(&ppshell_service_list_lock);
+	list_for_each_entry(cur, &ppshell_service_list_head, list)
+	{
+		printk("service name: %s - %s\n", cur->name, cur->description);
+	}
+	raw_spin_unlock(&ppshell_service_list_lock);
+
+	return 0;
+}
 
 #ifdef CONFIG_COMPAT
 struct compat_sysinfo {

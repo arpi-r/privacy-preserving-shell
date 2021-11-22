@@ -188,6 +188,7 @@ COND_SYSCALL(getgroups);
 COND_SYSCALL(sample_test);
 COND_SYSCALL(ppshell_create);
 COND_SYSCALL(ppshell_call);
+COND_SYSCALL(ppshell_list);
 
 /* kernel/time.c */
 
