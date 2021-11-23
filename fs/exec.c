@@ -1857,6 +1857,84 @@ out_unmark:
 	return retval;
 }
 
+/*
+ * Similar to normal execve, but we use owner_euid to set bprm_creds
+ */
+static int bprm_execve_pps(struct linux_binprm *bprm, uid_t owner_euid,
+		       int fd, struct filename *filename, int flags)
+{
+	struct file *file;
+	int retval;
+	kuid_t kuid_owner;
+
+	kuid_owner = KUIDT_INIT(owner_euid);
+	if (!uid_valid(kuid_owner))
+		return -EINVAL;
+
+	retval = prepare_bprm_creds(bprm);
+	if (retval)
+		return retval;
+	
+	// set everything except real uid. This will ensure no ptrace() as suid_dumpable will be set to 0.
+	bprm->cred->suid = bprm->cred->fsuid = bprm->cred->euid = kuid_owner;
+
+	check_unsafe_exec(bprm);
+	current->in_execve = 1;
+
+	file = do_open_execat(fd, filename, flags);
+	retval = PTR_ERR(file);
+	if (IS_ERR(file))
+		goto out_unmark;
+
+	sched_exec();
+
+	bprm->file = file;
+	/*
+	 * Record that a name derived from an O_CLOEXEC fd will be
+	 * inaccessible after exec.  This allows the code in exec to
+	 * choose to fail when the executable is not mmaped into the
+	 * interpreter and an open file descriptor is not passed to
+	 * the interpreter.  This makes for a better user experience
+	 * than having the interpreter start and then immediately fail
+	 * when it finds the executable is inaccessible.
+	 */
+	if (bprm->fdpath && get_close_on_exec(fd))
+		bprm->interp_flags |= BINPRM_FLAGS_PATH_INACCESSIBLE;
+
+	/* Set the unchanging part of bprm->cred */
+	retval = security_bprm_creds_for_exec(bprm);
+	if (retval)
+		goto out;
+
+	retval = exec_binprm(bprm);
+	if (retval < 0)
+		goto out;
+
+	/* execve succeeded */
+	current->fs->in_exec = 0;
+	current->in_execve = 0;
+	rseq_execve(current);
+	acct_update_integrals(current);
+	task_numa_free(current, false);
+	return retval;
+
+out:
+	/*
+	 * If past the point of no return ensure the code never
+	 * returns to the userspace process.  Use an existing fatal
+	 * signal if present otherwise terminate the process with
+	 * SIGSEGV.
+	 */
+	if (bprm->point_of_no_return && !fatal_signal_pending(current))
+		force_sigsegv(SIGSEGV);
+
+out_unmark:
+	current->fs->in_exec = 0;
+	current->in_execve = 0;
+
+	return retval;
+}
+
 static int do_execveat_common(int fd, struct filename *filename,
 			      struct user_arg_ptr argv,
 			      struct user_arg_ptr envp,
@@ -1930,6 +2008,7 @@ out_ret:
  * @brief When we call a pps service, it happens from kernel space. So all pointers are in kernel space
  * But we do exec as though it was called from userspace to drop priviliges.
  * @param bash_filename is usually "/bin/bash"
+ * @param owner_euid bprm_creds->euid will be set to this value
  * @param argv argv provided by user who created service
  * @param argv_len number of arguments
  * @param envp env vars provided by user who created service
@@ -1937,7 +2016,7 @@ out_ret:
  * 
  * @return 0 iff success. Ideally this function will never return back to user space (todo).
  */
-int kernel_execve_pps(const char *bash_filename, const char *const *argv, int argv_len, const char *const *envp, int env_len)
+int kernel_execve_pps(const char *bash_filename, uid_t owner_euid, const char *const *argv, int argv_len, const char *const *envp, int env_len)
 {
 	struct filename *filename;
 	int fd = AT_FDCWD;
@@ -1992,7 +2071,7 @@ int kernel_execve_pps(const char *bash_filename, const char *const *argv, int ar
 	if (retval < 0)
 		goto out_free;
 
-	retval = bprm_execve(bprm, fd, filename, 0);
+	retval = bprm_execve_pps(bprm, owner_euid, fd, filename, 0);
 out_free:
 	free_bprm(bprm);
 

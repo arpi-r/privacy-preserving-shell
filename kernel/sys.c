@@ -3099,53 +3099,6 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	return 0;
 }
 
-/**
- * @brief very similar to setuid, but we dont check priviliges here becayse
- * we already know that this call is authorized.
- * 
- * @param uid 
- * @return long 
- */
-long __sys_setuid_pps(uid_t uid)
-{
-	struct user_namespace *ns = current_user_ns();
-	const struct cred *old;
-	struct cred *new;
-	int retval;
-	kuid_t kuid;
-
-	kuid = make_kuid(ns, uid);
-	if (!uid_valid(kuid))
-		return -EINVAL;
-
-	new = prepare_creds();
-	if (!new)
-		return -ENOMEM;
-	old = current_cred();
-
-	new->suid = new->uid = kuid;
-	if (!uid_eq(kuid, old->uid)) {
-		retval = set_user(new);
-		if (retval < 0)
-			goto error;
-	}
-	new->fsuid = new->euid = kuid;
-
-	retval = security_task_fix_setuid(new, old, LSM_SETID_ID);
-	if (retval < 0)
-		goto error;
-
-	retval = set_cred_ucounts(new);
-	if (retval < 0)
-		goto error;
-
-	return commit_creds(new);
-
-error:
-	abort_creds(new);
-	return retval;
-}
-
 SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms) 
 {
 	int err;
@@ -3203,27 +3156,18 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 
 
 	bashscript_path = "/bin/bash";
-	command_wrapped[0] = '\"';
 	for(iter = 0; call_service->command[iter]; iter++)
-		command_wrapped[iter + 1] = call_service->command[iter];
-	command_wrapped[++iter] = '\"';
-	command_wrapped[++iter] = '\0';
+		command_wrapped[iter] = call_service->command[iter];
+	command_wrapped[iter] = '\0';
 
 	argv_bash[0] = bashscript_path;
 	argv_bash[1] = "-c";
 	argv_bash[2] = command_wrapped;
 
-	// todo: change creds
-	// change effective uid, no privilige check required as this is an authorized call
-	err_change_euid = __sys_setuid_pps(call_service->owner_euid);
-	// todo: if err no return (optional...)
-	if(err_change_euid)
-	{
-		err = -EAGAIN;
-		return err;
-	}
+	// change creds -- will be done during exec using bprm
+	// from below: if err no return, this is taken care by exec. (dethread(), etc.)
 
-	return kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
+	return kernel_execve_pps(bashscript_path, call_service->owner_euid, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
 }
 
 SYSCALL_DEFINE0(ppshell_list)
