@@ -140,6 +140,8 @@ int copy_string_kernel(const char *arg, struct linux_binprm *bprm);
 extern void set_binfmt(struct linux_binfmt *new);
 extern ssize_t read_code(struct file *, unsigned long, loff_t, size_t);
 
+int de_thread(struct task_struct *tsk);
+
 int kernel_execve(const char *filename,
 		  const char *const *argv, const char *const *envp);
 

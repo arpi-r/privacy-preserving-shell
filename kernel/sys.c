@@ -3099,6 +3099,57 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	return 0;
 }
 
+/**
+ * @brief very similar to setuid, but we dont check priviliges here becayse
+ * we already know that this call is authorized. This call sets effective uid
+ * according to setuid man page. begin_new_exec check if euid != uid
+ * for figuring out dumpability. commit_creds does this based on changes to euid
+ * from old cred to new. Both of these will set suid_dumpable = 0 as we are changing
+ * effective uid. This ensures ptrace() will not be possible.
+ * 
+ * @param uid 
+ * @return long 
+ */
+long __sys_setuid_pps(uid_t uid)
+{
+	struct user_namespace *ns = current_user_ns();
+	const struct cred *old;
+	struct cred *new;
+	int retval;
+	kuid_t kuid;
+
+	kuid = make_kuid(ns, uid);
+	if (!uid_valid(kuid))
+		return -EINVAL;
+
+	new = prepare_creds();
+	if (!new)
+		return -ENOMEM;
+	old = current_cred();
+
+	new->suid = new->uid = kuid;
+	if (!uid_eq(kuid, old->uid)) {
+		retval = set_user(new);
+		if (retval < 0)
+			goto error;
+	}
+	new->fsuid = new->euid = kuid;
+
+	retval = security_task_fix_setuid(new, old, LSM_SETID_ID);
+	if (retval < 0)
+		goto error;
+
+	retval = set_cred_ucounts(new);
+	if (retval < 0)
+		goto error;
+
+	return commit_creds(new);
+
+error:
+	abort_creds(new);
+	return retval;
+}
+
 SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms) 
 {
 	int err;
@@ -3164,10 +3215,26 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	argv_bash[1] = "-c";
 	argv_bash[2] = command_wrapped;
 
-	// change creds -- will be done during exec using bprm
-	// from below: if err no return, this is taken care by exec. (dethread(), etc.)
+	// from below: if err no return (also dethread())
+	err = de_thread(current);
+	if(err)
+		goto noret;
 
-	return kernel_execve_pps(bashscript_path, call_service->owner_euid, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
+	// change effective uid, no privilige check required as this is an authorized call
+	err_change_euid = __sys_setuid_pps(call_service->owner_euid);
+	if(err_change_euid)
+	{
+		err = -EAGAIN;
+		goto noret;
+	}
+
+	err = kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
+	goto noret;
+
+noret:
+	if (!fatal_signal_pending(current))
+		force_sigsegv(SIGSEGV); // point of no return
+	return err;
 }
 
 SYSCALL_DEFINE0(ppshell_list)
