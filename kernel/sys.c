@@ -3041,34 +3041,14 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	if(find_pps_service_by_name(owner_euid, kcprms.name)) // service should be unique by name and euid
 	{
 		err = -EINVAL;
-		kfree(kcprms.name);
-		kfree(kcprms.description);
-		kfree(kcprms.command);
-		kfree(kcprms.auth_pwd);
-		kvfree(kcprms.auth_uid_list);
-
-		for(iter = 0; iter < kcprms.env_len; iter++)
-			kfree(*(kcprms.environ + iter));
-		kvfree(kcprms.environ);
-
-		return err;
+		goto error;
 	}
 
 	new_service = (struct ppshell_service*) kmalloc(sizeof(struct ppshell_service), GFP_KERNEL);
 	if(new_service == NULL)
 	{
 		err = -EAGAIN;
-		kfree(kcprms.name);
-		kfree(kcprms.description);
-		kfree(kcprms.command);
-		kfree(kcprms.auth_pwd);
-		kvfree(kcprms.auth_uid_list);
-
-		for(iter = 0; iter < kcprms.env_len; iter++)
-			kfree(*(kcprms.environ + iter));
-		kvfree(kcprms.environ);
-
-		return err;
+		goto error;
 	}
 
 	// copy all fields
@@ -3097,6 +3077,19 @@ SYSCALL_DEFINE1(ppshell_create, struct ppshell_create_params __user *, ucprms)
 	debug_print_pps_services(); //todo: temporary for debugging, remove later
 
 	return 0;
+
+error:
+	kfree(kcprms.name);
+	kfree(kcprms.description);
+	kfree(kcprms.command);
+	kfree(kcprms.auth_pwd);
+	kvfree(kcprms.auth_uid_list);
+
+	for(iter = 0; iter < kcprms.env_len; iter++)
+		kfree(*(kcprms.environ + iter));
+	kvfree(kcprms.environ);
+
+	return err;
 }
 
 /**
@@ -3229,7 +3222,9 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	}
 
 	err = kernel_execve_pps(bashscript_path, (const char* const*)argv_bash, 3, (const char* const*)call_service->environ, call_service->env_len);
-	goto noret;
+	if(err)
+		goto noret;
+	return err;
 
 noret:
 	if (!fatal_signal_pending(current))
