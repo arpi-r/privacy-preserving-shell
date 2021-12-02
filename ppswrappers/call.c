@@ -1,10 +1,18 @@
 #include<unistd.h>
 #include<stdio.h>
 #include<sys/syscall.h>
+#include<sys/types.h>
+#include<sys/wait.h>
 #include<linux/types.h>
 #include<stdlib.h>
 #include<string.h>
 #include<termios.h>
+#include<errno.h>
+
+#define PIPE_READ_END 0
+#define PIPE_WRITE_END 1
+
+extern int errno;
 
 // https://www.gnu.org/software/libc/manual/html_node/getpass.html
 ssize_t my_getpass (char **lineptr, size_t *n, FILE *stream)
@@ -70,7 +78,6 @@ uid_t getuidfromstr(char* str)
 }
 
 int main(int argc, char** argv) {
-
 	if(argc < 3)
 		usage();
 	
@@ -102,15 +109,54 @@ int main(int argc, char** argv) {
 		pwd[pwd_read - 1] = 0; // discarding \n
 	}
 
+	int pipe_fd[2];
+
+	if(pipe(pipe_fd) == -1)
+	{
+		fprintf(stderr, "Unable to create pipes: try again");
+		exit(-1);
+	}
+
 	int pid=fork();
 
-	if(pid<0) /* Why is this here? */
+	if(pid<0)
 	{
 		fprintf(stderr, "Fork failed: try again");
 		exit(-1);
 	}
 	else if (pid == 0)
 	{
+		if(dup2(pipe_fd[PIPE_WRITE_END], STDOUT_FILENO) == -1)
+		{
+			fprintf(stderr, "Child process: unable to dup stdout\n");
+			exit(-1);
+		}
+
+		if(dup2(pipe_fd[PIPE_WRITE_END], STDERR_FILENO) == -1)
+		{
+			fprintf(stderr, "Child process: unable to dup stderr\n");
+			exit(-1);
+		}
+
+		int fdlimit = (int)sysconf(_SC_OPEN_MAX);
+		for(int fdnum = 0; fdnum <= fdlimit; fdnum++)
+		{
+			if(fdnum == STDOUT_FILENO || fdnum == STDERR_FILENO)
+				continue;
+			int ret = close(fdnum);
+			if(ret == -1 && errno != EBADF)
+			{
+				fprintf(stderr, "Child process: unable to close fd %d\n", fdnum);
+				exit(-1);
+			}
+		}
+
+		if(chdir("/tmp"))
+		{
+			fprintf(stderr, "Child process: unable to cd to tmp\n");
+			exit(-1);
+		}
+
 		printf("Making syscall to execute service\n");
 		
 		struct ppshell_call_params ppcprms;
@@ -120,12 +166,42 @@ int main(int argc, char** argv) {
 		ppcprms.auth_pwd = pwd;
 		
 		int x = makesyscall(&ppcprms);
-		printf("%d\n", x);
+		printf("ppscall return value: %d\n", x);
 	}
 	else
 	{
-		printf("Waiting for child to finish\n");
-		wait(pid);
+		close(pipe_fd[PIPE_WRITE_END]);
+		printf("\nWaiting for child to finish\n");
+
+		int exit_status;
+		int res_pid;
+
+		for(int retries=1; retries <= 6000; retries++) // 10ms * 6000 = 60s
+		{
+			res_pid = waitpid(pid, &exit_status, WNOHANG);
+			if(res_pid == pid)
+				break;
+			usleep(10000); // 10 ms
+		}
+
+		if(res_pid == pid)
+			printf("Child exited with status: %d\n", exit_status);
+		else
+		{
+			printf("Child exit timeout!!\n");
+			exit(0);
+		}
+
+		printf("Outcome of ppscall\n");
+		char buf[1023];
+		while(1)
+		{
+			int n_read = read(pipe_fd[PIPE_READ_END], buf, 1000);
+			if(n_read < 1)
+				break;
+			buf[n_read] = 0;
+			printf("%s", buf);
+		}
 	}
 	
 	return 0;
