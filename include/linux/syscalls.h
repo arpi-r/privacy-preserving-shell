@@ -1274,7 +1274,7 @@ asmlinkage long sys_ppshell_create(struct ppshell_create_params __user *ucprms);
 
 asmlinkage long sys_ppshell_call(struct ppshell_call_params __user *ucprms);
 
-asmlinkage long sys_ppshell_list(void);
+asmlinkage long sys_ppshell_list(char __user *list_info, int __user *list_sizes);
 
 /*
  * Not a real system call, but a placeholder for syscalls which are

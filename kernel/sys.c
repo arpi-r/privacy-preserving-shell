@@ -3232,18 +3232,56 @@ noret:
 	return err;
 }
 
-SYSCALL_DEFINE0(ppshell_list)
+SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes)
 {
 	struct ppshell_service* cur = NULL;
-	
+	int *sizes;
+	int num_services = 0, ind = 0;
+
 	printk("ppshell list:\n");
-	
+
+	raw_spin_lock(&ppshell_service_list_lock);
+	list_for_each_entry(cur, &ppshell_service_list_head, list)
+	{
+		num_services++;
+	}
+	raw_spin_unlock(&ppshell_service_list_lock);
+
+	sizes = (int *) kmalloc(num_services * 2 * sizeof(int), GFP_KERNEL);
+
 	raw_spin_lock(&ppshell_service_list_lock);
 	list_for_each_entry(cur, &ppshell_service_list_head, list)
 	{
 		printk("service name: %s - %s\n", cur->name, cur->description);
+
+		if (copy_to_user(list_info, cur->name, strlen(cur->name)))
+		{
+			return -EFAULT;
+		}
+
+		list_info += strlen(cur->name);
+
+		sizes[ind] = strlen(cur->name);
+		ind++;
+
+		if (copy_to_user(list_info, cur->description, strlen(cur->description)))
+		{
+			return -EFAULT;
+		}
+
+		list_info += strlen(cur->description);
+
+		sizes[ind] = strlen(cur->description);
+		ind++;
+
+		printk("sizes: %d - %d\n", sizes[ind-2], sizes[ind-1]);
 	}
 	raw_spin_unlock(&ppshell_service_list_lock);
+
+	if (copy_to_user(list_sizes, sizes, sizeof(int)*num_services*2))
+	{
+		return -EFAULT;
+	}
 
 	return 0;
 }

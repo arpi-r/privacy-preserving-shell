@@ -33,4 +33,9 @@ struct ppshell_call_params {
     char *auth_pwd;// password based auth (NULL = not checked)
 };
 
+struct ppshell_list_values {
+	char *name;
+	char *desc;
+};
+
 #endif /* _UAPI_LINUX_PPSHELL_H */
