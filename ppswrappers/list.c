@@ -14,6 +14,17 @@ char* substr(const char *src, int m, int len)
 	return dest;
 }
 
+int makesyscall_get_num_services(int *num_services)
+{
+	int err;
+	__asm(
+		"MOV x8, #554;" //x8 holds syscall no
+		"SVC #0;"      // supervisor call
+		"MOV %[result], x0" : [result] "=r"(err) // copy return code to err variable
+	);
+	return err;
+}
+
 int makesyscall(char *list_info, int *list_sizes)
 {
 	int err;	
@@ -29,18 +40,20 @@ int main()
 {
 	char *list_vals;
 	list_vals = (char *) malloc(100);
+	int cur = 0;
 
-	int num_services = 2, cur = 0;
+	int *num_services = (int *) malloc(sizeof(int));
+	int ret_getnum = makesyscall_get_num_services(num_services);
 
 	int *list_sizes;
-	list_sizes = (int *) malloc(num_services * 3 * sizeof(int));
+	list_sizes = (int *) malloc(*num_services * 3 * sizeof(int));
 
 	int ret = makesyscall(list_vals, list_sizes);
 
-	printf("ppslist syscall: %d\n", ret);
+	// printf("ppslist syscall: %d\n", ret);
 
 	printf("List of Services Available:\n");
-	for (int i = 0; i < (num_services*3); i+=3)
+	for (int i = 0; i < (*num_services * 3); i+=3)
 	{
 		char *euid = substr(list_vals, cur, list_sizes[i]);
 		cur += list_sizes[i];
