@@ -6,7 +6,7 @@
 
 int makesyscall(int *num_services)
 {
-	int err;	
+	int err;
 	__asm(
 		"MOV x8, #554;" //x8 holds syscall no
 		"SVC #0;"      // supervisor call
@@ -21,7 +21,9 @@ int main()
 
 	int ret = makesyscall(num_services);
 
-	printf("pps_get_num_services syscall: %d\n", ret);
+	// printf("pps_get_num_services syscall: %d\n", ret);
+	// printf("Number of services = %d\n", *num_services);
+	printf("%d\n", *num_services);
 
 	return 0;
 }

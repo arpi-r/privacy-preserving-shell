@@ -3291,7 +3291,23 @@ SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes
 
 SYSCALL_DEFINE1(ppshell_get_num_services, int __user *, num_services)
 {
-	printk("reached ppshell get num services\n");
+	struct ppshell_service* cur = NULL;
+	int ppshell_num_services = 0;
+
+	raw_spin_lock(&ppshell_service_list_lock);
+	list_for_each_entry(cur, &ppshell_service_list_head, list)
+	{
+		ppshell_num_services++;
+	}
+	raw_spin_unlock(&ppshell_service_list_lock);
+
+	printk("ppshell number of services = %d\n", ppshell_num_services);
+
+	if (copy_to_user(num_services, &ppshell_num_services, sizeof(int)))
+	{
+		return -EFAULT;
+	}
+
 	return 0;
 }
 
