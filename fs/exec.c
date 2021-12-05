@@ -1975,6 +1975,8 @@ int kernel_execve_pps(const char *bash_filename, const char *const *argv, int ar
 	bprm->argc = argv_len;
 	bprm->envc = env_len;
 
+	bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP; // force no dump
+
 	retval = bprm_stack_limits(bprm);
 	if (retval < 0)
 		goto out_free;
