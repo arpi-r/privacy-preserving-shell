@@ -3235,11 +3235,11 @@ noret:
 SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes)
 {
 	// TODO: input user uid_t, compare with auth list before adding to list
-	// TODO: print owner euid on calling list
 
 	struct ppshell_service* cur = NULL;
 	int *sizes;
-	int num_services = 0, ind = 0;
+	int num_services = 0, ind = 0, euid_len = 0;
+	char service_owner_euid[6];
 
 	printk("ppshell list:\n");
 
@@ -3250,12 +3250,28 @@ SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes
 	}
 	raw_spin_unlock(&ppshell_service_list_lock);
 
-	sizes = (int *) kmalloc(num_services * 2 * sizeof(int), GFP_KERNEL);
+	sizes = (int *) kmalloc(num_services * 3 * sizeof(int), GFP_KERNEL);
 
 	raw_spin_lock(&ppshell_service_list_lock);
 	list_for_each_entry(cur, &ppshell_service_list_head, list)
 	{
-		printk("service name: %s - %s\n", cur->name, cur->description);
+		printk("service name: %d: %s - %s\n", cur->owner_euid, cur->name, cur->description);
+
+		for (euid_len = 0; service_owner_euid[euid_len]!='\0'; euid_len++)
+			service_owner_euid[euid_len] = '\0';
+		sprintf (service_owner_euid, "%u", cur->owner_euid);
+		for (euid_len = 0; service_owner_euid[euid_len]!='\0'; euid_len++);
+		printk("euid - %s; len - %d\n", service_owner_euid, euid_len);
+
+		if (copy_to_user(list_info, service_owner_euid, euid_len))
+		{
+			return -EFAULT;
+		}
+
+		list_info += euid_len;
+
+		sizes[ind] = euid_len;
+		ind++;
 
 		if (copy_to_user(list_info, cur->name, strlen(cur->name)))
 		{
@@ -3277,11 +3293,11 @@ SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes
 		sizes[ind] = strlen(cur->description);
 		ind++;
 
-		printk("sizes: %d - %d\n", sizes[ind-2], sizes[ind-1]);
+		printk("sizes: %d: %d - %d\n", sizes[ind-3], sizes[ind-2], sizes[ind-1]);
 	}
 	raw_spin_unlock(&ppshell_service_list_lock);
 
-	if (copy_to_user(list_sizes, sizes, sizeof(int)*num_services*2))
+	if (copy_to_user(list_sizes, sizes, sizeof(int)*num_services*3))
 	{
 		return -EFAULT;
 	}

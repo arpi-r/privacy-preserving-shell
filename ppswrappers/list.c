@@ -33,20 +33,22 @@ int main()
 	int num_services = 2, cur = 0;
 
 	int *list_sizes;
-	list_sizes = (int *) malloc(num_services * 2 * sizeof(int));
+	list_sizes = (int *) malloc(num_services * 3 * sizeof(int));
 
 	int ret = makesyscall(list_vals, list_sizes);
 
 	printf("ppslist syscall: %d\n", ret);
 
 	printf("List of Services Available:\n");
-	for (int i = 0; i < (num_services*2); i+=2)
+	for (int i = 0; i < (num_services*3); i+=3)
 	{
-		char *name = substr(list_vals, cur, list_sizes[i]);
+		char *euid = substr(list_vals, cur, list_sizes[i]);
 		cur += list_sizes[i];
-		char *desc = substr(list_vals, cur, list_sizes[i+1]);
+		char *name = substr(list_vals, cur, list_sizes[i+1]);
 		cur += list_sizes[i+1];
-		printf("%s\t- %s\n", name, desc);
+		char *desc = substr(list_vals, cur, list_sizes[i+2]);
+		cur += list_sizes[i+2];
+		printf("%s: %s\t- %s\n", euid, name, desc);
 	}
 
 	return 0;
