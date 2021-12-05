@@ -497,7 +497,10 @@ __SYSCALL(__NR_ppshell_create, sys_ppshell_create)
 __SYSCALL(__NR_ppshell_call, sys_ppshell_call)
 #define __NR_ppshell_list 553
 __SYSCALL(__NR_ppshell_list, sys_ppshell_list)
-
+#define __NR_ppshell_get_num_services 554
+__SYSCALL(__NR_ppshell_get_num_services, sys_ppshell_get_num_services)
+#define __NR_ppshell_show 555
+__SYSCALL(__NR_ppshell_show, sys_ppshell_show)
 
 #ifdef __ARCH_WANT_SET_GET_RLIMIT
 /* getrlimit and setrlimit are superseded with prlimit64 */

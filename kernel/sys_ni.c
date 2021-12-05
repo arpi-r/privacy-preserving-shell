@@ -189,6 +189,8 @@ COND_SYSCALL(sample_test);
 COND_SYSCALL(ppshell_create);
 COND_SYSCALL(ppshell_call);
 COND_SYSCALL(ppshell_list);
+COND_SYSCALL(ppshell_get_num_services);
+COND_SYSCALL(ppshell_show);
 
 /* kernel/time.c */
 

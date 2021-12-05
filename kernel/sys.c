@@ -3234,6 +3234,9 @@ noret:
 
 SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes)
 {
+	// TODO: input user uid_t, compare with auth list before adding to list
+	// TODO: print owner euid on calling list
+
 	struct ppshell_service* cur = NULL;
 	int *sizes;
 	int num_services = 0, ind = 0;
@@ -3285,6 +3288,19 @@ SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes
 
 	return 0;
 }
+
+SYSCALL_DEFINE1(ppshell_get_num_services, int __user *, num_services)
+{
+	printk("reached ppshell get num services\n");
+	return 0;
+}
+
+SYSCALL_DEFINE3(ppshell_show, char __user *, service_name, char __user *, service_info, int __user *, service_size)
+{
+	printk("reached ppshell show\n");
+	return 0;
+}
+
 
 #ifdef CONFIG_COMPAT
 struct compat_sysinfo {
