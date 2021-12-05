@@ -3234,12 +3234,12 @@ noret:
 
 SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes)
 {
-	// TODO: input user uid_t, compare with auth list before adding to list
-
 	struct ppshell_service* cur = NULL;
 	int *sizes;
-	int num_services = 0, ind = 0, euid_len = 0;
+	int num_services = 0, ind = 0, euid_len = 0, i = 0;
 	char service_owner_euid[6];
+	uid_t caller_euid = from_kuid_munged(current_user_ns(), current_euid());
+	bool found_in_auth_list = true;
 
 	printk("ppshell list:\n");
 
@@ -3256,6 +3256,27 @@ SYSCALL_DEFINE2(ppshell_list, char __user *, list_info, int __user *, list_sizes
 	list_for_each_entry(cur, &ppshell_service_list_head, list)
 	{
 		printk("service name: %d: %s - %s\n", cur->owner_euid, cur->name, cur->description);
+
+		if (cur->owner_euid != caller_euid)
+		{
+			if (cur->auth_pwd == NULL)
+			{
+				found_in_auth_list = false;
+				for (i = 0; i < cur->auth_uid_len; i++)
+				{
+					if (cur->auth_uid_list[i] == caller_euid)
+					{
+						found_in_auth_list = true;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!found_in_auth_list)
+		{
+			continue;
+		}
 
 		for (euid_len = 0; service_owner_euid[euid_len]!='\0'; euid_len++)
 			service_owner_euid[euid_len] = '\0';
