@@ -5,6 +5,10 @@
 #include<stdlib.h>
 #include<string.h>
 #include<termios.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<pwd.h>
+#include<time.h>
 
 struct ppshell_create_params {
     __u32 size; // for fwd/bkw compatability
@@ -63,6 +67,31 @@ ssize_t my_getpass (char **lineptr, size_t *n, FILE *stream)
 }
 
 
+char* create_pps_script(char* service_name, char* service_cmd)
+{
+	struct passwd* pw = getpwuid(getuid());
+	const char* homedir = pw->pw_dir;
+	char ppsdir[100];
+
+	sprintf(ppsdir, "%s/.pps", homedir);
+
+	struct stat st = {0};
+	if (stat(ppsdir, &st) == -1) {
+		mkdir(ppsdir, 0700);
+	}
+
+	char* filename = (char*) malloc(1000);
+	sprintf(filename, "%s/%s-%ld.sh", ppsdir, service_name, time(NULL));
+
+	FILE *fptr = fopen(filename, "w");
+	chmod(filename, S_IRUSR|S_IWUSR|S_IXUSR); // 700
+	fprintf(fptr, "%s", service_cmd);
+	fclose(fptr);
+
+	return filename;
+}
+
+
 int main() {
 
 	struct ppshell_create_params ppcprms;
@@ -118,8 +147,11 @@ int main() {
 		}
 	}
 
+	char* pps_file = create_pps_script(ppcprms.name, ppcprms.command);
+	ppcprms.command = pps_file;
+
 	int x = makesyscall(&ppcprms);
-	printf("%d\n", x);
+	printf("pps_call return value: %d\n", x);
 	
 	return 0;
 }
