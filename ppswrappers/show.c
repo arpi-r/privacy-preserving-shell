@@ -27,7 +27,6 @@ int makesyscall(char *service_name, int *service_name_size, char *service_info, 
 
 int main()
 {
-	// TODO: print actual command
 	size_t max_name_size = 100;
 	char *service_name = (char *) malloc(max_name_size);
 	int service_name_len = max_name_size;
@@ -69,7 +68,29 @@ int main()
 	printf("Description: %s\n", substr(service_info, cur, service_size[1]));
 	cur += service_size[1];
 
-	printf("Command: %s\n", substr(service_info, cur, service_size[2]));
+	// printf("Command: %s\n", substr(service_info, cur, service_size[2]));
+	// cur += service_size[2];
+
+	char bash_cmd[256];
+	strncpy(bash_cmd, "cat ", 4);
+	strncat(bash_cmd, substr(service_info, cur, service_size[2]), service_size[2]);
+	char command[800];
+	FILE *pipe;
+	int command_len;
+
+	pipe = popen(bash_cmd, "r");
+	if (NULL == pipe) {
+		perror("pipe");
+		exit(1);
+	}
+	fgets(command, sizeof(command), pipe);
+
+	command_len = strlen(command);
+	command[command_len] = '\0';
+
+	pclose(pipe);
+
+	printf("Command: %s\n", command);
 	cur += service_size[2];
 
 	if (service_size[3] == -1)
