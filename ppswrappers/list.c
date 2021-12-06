@@ -38,21 +38,40 @@ int makesyscall(char *list_info, int *list_sizes)
 
 int main()
 {
-	// TODO: Handle size allocation for list_vals
-	// TODO: Handle special cases: syscall fails, no service in list
-	char *list_vals;
-	list_vals = (char *) malloc(100);
 	int cur = 0;
 
 	int *num_services = (int *) malloc(sizeof(int));
 	int ret_getnum = makesyscall_get_num_services(num_services);
 
+	if (ret_getnum != 0)
+	{
+		printf("pps_get_num_services syscall failed\n");
+		return ret_getnum;
+	}
+
+
+	if (*num_services == 0)
+	{
+		printf("No services exist\n");
+		return 0;
+	}
+
 	int *list_sizes;
 	list_sizes = (int *) malloc(*num_services * 3 * sizeof(int));
+
+	char *list_vals;
+	list_vals = (char *) malloc(*num_services * 1107);
 
 	int ret = makesyscall(list_vals, list_sizes);
 
 	// printf("ppslist syscall: %d\n", ret);
+
+	if (ret != 0)
+	{
+		printf("pps_list syscall failed\n");
+		return ret;
+	}
+
 
 	printf("List of Services Available:\n");
 	for (int i = 0; i < (*num_services * 3); i+=3)
