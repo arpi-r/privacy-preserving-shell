@@ -3348,9 +3348,145 @@ SYSCALL_DEFINE1(ppshell_get_num_services, int __user *, num_services)
 	return 0;
 }
 
-SYSCALL_DEFINE3(ppshell_show, char __user *, service_name, char __user *, service_info, int __user *, service_size)
+SYSCALL_DEFINE4(ppshell_show, char __user *, service_name, int __user *, service_name_size, char __user *, service_info, int __user *, service_size)
 {
-	printk("reached ppshell show\n");
+	struct ppshell_service* cur = NULL;
+	int *name_size;
+	char *name;
+	int i = 0, ind = 0, auth_euid_len = 0;
+	char auth_euid[6];
+	uid_t caller_euid = from_kuid_munged(current_user_ns(), current_euid());
+	int *sizes = (int *) kmalloc(sizeof(int) * 207, GFP_KERNEL);
+
+	// printk("reached ppshell show\n");
+
+	name_size = (int *) kmalloc(sizeof(int), GFP_KERNEL);
+	if (copy_from_user(name_size, service_name_size, sizeof(int)))
+	{
+		printk("copying name size to kernel failed!\n");
+		return -EFAULT;
+	}
+
+	name = (char *) kmalloc(*name_size, GFP_KERNEL);
+	if (copy_from_user(name, service_name, *name_size))
+	{
+		printk("copying name to kernel failed!\n");
+		return -EFAULT;
+	}
+
+	printk("euid: %d - name: %s\n", caller_euid, name);
+
+	raw_spin_lock(&ppshell_service_list_lock);
+	list_for_each_entry(cur, &ppshell_service_list_head, list)
+	{
+		if (strncmp(name, cur->name, *name_size) == 0 && caller_euid == cur->owner_euid)
+		{
+			printk("found service\n");
+
+			for (auth_euid_len = 0; auth_euid[auth_euid_len]!='\0'; auth_euid_len++)
+			auth_euid[auth_euid_len] = '\0';
+			sprintf (auth_euid, "%u", caller_euid);
+			for (auth_euid_len = 0; auth_euid[auth_euid_len]!='\0'; auth_euid_len++);
+			if (copy_to_user(service_info, auth_euid, auth_euid_len))
+			{
+				printk("copying auth_uid_list[%d] to user failed!\n", i);
+				return -EFAULT;
+			}
+			service_info += auth_euid_len;
+
+			sizes[ind] = auth_euid_len;
+			ind++;
+
+			if (copy_to_user(service_info, cur->description, strlen(cur->description)))
+			{
+				printk("copying description to user failed!\n");
+				return -EFAULT;
+			}
+			service_info += strlen(cur->description);
+
+			sizes[ind] = strlen(cur->description);
+			ind++;
+
+			if (copy_to_user(service_info, cur->command, strlen(cur->command)))
+			{
+				printk("copying command to user failed!\n");
+				return -EFAULT;
+			}
+			service_info += strlen(cur->command);
+
+			sizes[ind] = strlen(cur->command);
+			ind++;
+
+			if (cur->auth_pwd != NULL)
+			{
+				if (copy_to_user(service_info, cur->auth_pwd, strlen(cur->auth_pwd)))
+				{
+					printk("copying auth_pwd to user failed!\n");
+					return -EFAULT;
+				}
+				service_info += strlen(cur->auth_pwd);
+
+				sizes[ind] = strlen(cur->auth_pwd);
+				ind++;
+			}
+			else
+			{
+				sizes[ind] = -1;
+				ind++;
+			}
+
+			sizes[ind] = cur->auth_uid_len;
+			ind++;
+			if (cur->auth_uid_len != 0)
+			{
+				for (i = 0; i < cur->auth_uid_len; i++)
+				{
+					for (auth_euid_len = 0; auth_euid[auth_euid_len]!='\0'; auth_euid_len++)
+						auth_euid[auth_euid_len] = '\0';
+					sprintf (auth_euid, "%u", cur->auth_uid_list[i]);
+					for (auth_euid_len = 0; auth_euid[auth_euid_len]!='\0'; auth_euid_len++);
+
+					if (copy_to_user(service_info, auth_euid, auth_euid_len))
+					{
+						printk("copying auth_uid_list[%d] to user failed!\n", i);
+						return -EFAULT;
+					}
+					service_info += auth_euid_len;
+
+					sizes[ind] = auth_euid_len;
+					ind++;
+				}
+			}
+
+			sizes[ind] = cur->env_len;
+			ind++;
+			if (cur->env_len != 0)
+			{
+				for (i = 0; i < cur->env_len; i++)
+				{
+					if (copy_to_user(service_info, cur->environ[i], strlen(cur->environ[i])))
+					{
+						printk("copying environ[%d] to user failed!\n", i);
+						return -EFAULT;
+					}
+					service_info += strlen(cur->environ[i]);
+
+					sizes[ind] = strlen(cur->environ[i]);
+					ind++;
+				}
+			}
+
+			break;
+		}
+	}
+	raw_spin_unlock(&ppshell_service_list_lock);
+
+	if (copy_to_user(service_size, sizes, sizeof(int)*207))
+	{
+		printk("copying service info sizes to user failed!\n");
+		return -EFAULT;
+	}
+
 	return 0;
 }
 

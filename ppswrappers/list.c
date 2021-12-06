@@ -38,6 +38,8 @@ int makesyscall(char *list_info, int *list_sizes)
 
 int main()
 {
+	// TODO: Handle size allocation for list_vals
+	// TODO: Handle special cases: syscall fails, no service in list
 	char *list_vals;
 	list_vals = (char *) malloc(100);
 	int cur = 0;

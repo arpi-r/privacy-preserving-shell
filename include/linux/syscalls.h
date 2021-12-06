@@ -1277,7 +1277,7 @@ asmlinkage long sys_ppshell_call(struct ppshell_call_params __user *ucprms);
 asmlinkage long sys_ppshell_list(char __user *list_info, int __user *list_sizes);
 
 asmlinkage long sys_ppshell_get_num_services(int __user *num_services);
-asmlinkage long sys_ppshell_show(char __user *service_name, char __user *service_info, int __user *service_size);
+asmlinkage long sys_ppshell_show(char __user *service_name, int __user *service_name_size, char __user *service_info, int __user *service_size);
 
 /*
  * Not a real system call, but a placeholder for syscalls which are
