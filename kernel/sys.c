@@ -3374,12 +3374,12 @@ SYSCALL_DEFINE4(ppshell_show, char __user *, service_name, int __user *, service
 		return -EFAULT;
 	}
 
-	printk("euid: %d - name: %s\n", caller_euid, name);
+	printk("euid: %d - name: %s - name size: %d\n", caller_euid, name, *name_size);
 
 	raw_spin_lock(&ppshell_service_list_lock);
 	list_for_each_entry(cur, &ppshell_service_list_head, list)
 	{
-		if (strncmp(name, cur->name, *name_size) == 0 && caller_euid == cur->owner_euid)
+		if ((strlen(cur->name) == *name_size && strncmp(name, cur->name, *name_size) == 0) && caller_euid == cur->owner_euid)
 		{
 			printk("found service\n");
 
