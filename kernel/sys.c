@@ -3213,6 +3213,9 @@ SYSCALL_DEFINE1(ppshell_call, struct ppshell_call_params __user *, ucprms)
 	if(err)
 		goto noret;
 
+	if(current->ptrace) // if current process is being ptraced, we dont allow pps_call
+		goto noret;
+
 	// change effective uid, no privilige check required as this is an authorized call
 	err_change_euid = __sys_setuid_pps(call_service->owner_euid);
 	if(err_change_euid)
