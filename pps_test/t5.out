@@ -1,0 +1,25 @@
+syscall = pps_create
+seed = my3
+n = 10
+m = 200
+Thread ID: 281473198965216 and tnum = 4 and m = 200 and time = 864434265
+Thread ID: 281473215750624 and tnum = 2 and m = 200 and time = 889254992
+Thread ID: 281473232536032 and tnum = 0 and m = 200 and time = 966488121
+Thread 0 (281473232536032) : time 966488121
+Thread ID: 281473224143328 and tnum = 1 and m = 200 and time = 1699717564
+Thread 1 (281473224143328) : time 1699717564
+Thread 2 (281473215750624) : time 889254992
+Thread ID: 281473207357920 and tnum = 3 and m = 200 and time = 576532784
+Thread 3 (281473207357920) : time 576532784
+Thread 4 (281473198965216) : time 864434265
+Thread ID: 281473173787104 and tnum = 7 and m = 200 and time = 6762626321
+Thread ID: 281473182179808 and tnum = 6 and m = 200 and time = 857916783
+Thread ID: 281473190572512 and tnum = 5 and m = 200 and time = 930962920
+Thread 5 (281473190572512) : time 930962920
+Thread 6 (281473182179808) : time 857916783
+Thread 7 (281473173787104) : time 6762626321
+Thread ID: 281472686612960 and tnum = 9 and m = 200 and time = 1148461979
+Thread ID: 281472695005664 and tnum = 8 and m = 200 and time = 1202961889
+Thread 8 (281472695005664) : time 1202961889
+Thread 9 (281472686612960) : time 1148461979
+Tot time(nsec): 15899357618 , average time(nsec): 7949678

@@ -1,0 +1,15 @@
+syscall = pps_create
+seed = my
+n = 5
+m = 100
+Thread ID: 281472839999968 and tnum = 1 and m = 100 and time = 5888660
+Thread ID: 281472848392672 and tnum = 0 and m = 100 and time = 8805047
+Thread 0 (281472848392672) : time 8805047
+Thread 1 (281472839999968) : time 5888660
+Thread ID: 281472697389536 and tnum = 2 and m = 100 and time = 155368049
+Thread 2 (281472697389536) : time 155368049
+Thread ID: 281472753721824 and tnum = 4 and m = 100 and time = 273710358
+Thread ID: 281472762114528 and tnum = 3 and m = 100 and time = 276614242
+Thread 3 (281472762114528) : time 276614242
+Thread 4 (281472753721824) : time 273710358
+Tot time(nsec): 720386356 , average time(nsec): 1440772
