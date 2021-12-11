@@ -1,0 +1,7 @@
+syscall = pps_create
+seed = single
+n = 1
+m = 6000
+Thread ID: 281473682514400 and tnum = 0 and m = 6000 and time = 47272368838
+Thread 0 (281473682514400) : time 47272368838
+Tot time(nsec): 47272368838 , average time(nsec): 7878728
