@@ -11,6 +11,9 @@ More details of this work can be found in our Final Report <TODO: add link>.
 
 The implementation is based on the 5.14 release version of the Linux Kernel.
 
+> NOTE: The code has been tested on ARM64 architecture. Testing on x86
+> architecture is not trivial, and will require adding syscall entries.
+
 ## Compiling and Booting the Linux Kernel code (including the PPS implementation)
 
  - Clone `https://github.com/arpi-r/privacy-preserving-shell`
@@ -28,7 +31,15 @@ The implementation is based on the 5.14 release version of the Linux Kernel.
 
 The PPS wrapper binaries can be found in the ppswrappers folder. Enter the directory: `cd ppswrappers`.
 
- - To create a new service run: `./pps_create`
- - To run an existing service: `./pps_call <name> <owner_uid> [-p]` (-p is optional, if you want to run the service using a password)
- - To list all services: `./pps_list`
- - To display information about a given service: `./pps_show`
+ - To create a new service run: 
+	 - `gcc create.c -o pps_create`
+	 - `./pps_create`
+ - To run an existing service: 
+	 - `gcc call.c -o pps_call`
+	 - `./pps_call <name> <owner_uid> [-p]` (-p is optional, if you want to run the service using a password)
+ - To list all services: 
+	 - `gcc list.c -o pps_list`
+	 - `./pps_list`
+ - To display information about a given service: 
+	 - `gcc show.c -o pps_show`
+	 - `./pps_show`
